@@ -609,6 +609,8 @@ def argon_cs(Tr, Pr):
     f = "Argon"
     Tc, Pc = CP.PropsSI("Tcrit", f), CP.PropsSI("pcrit", f)
     R = 8.314462618 / CP.PropsSI("molar_mass", f)
+    if abs(Tr - 1.0) < 1e-6:
+        Tr = 1.0005      # exactly at Tc some CoolProp versions fail; this is visually identical
     T, P, Plow = Tr * Tc, Pr * Pc, 1.0           # Plow = 1 Pa stands in for ideal gas
     Z = CP.PropsSI("Z", "T", T, "P", P, f)
     Zh = (CP.PropsSI("H", "T", T, "P", Plow, f) - CP.PropsSI("H", "T", T, "P", P, f)) / (R * Tc)
@@ -633,7 +635,11 @@ def cs_chart(kind):
                 if abs(Pr - Ps) / Ps < 0.02:
                     continue                       # skip the two-phase region
                 k = "v" if Pr < Ps else "l"
-            segs[k][0].append(Pr); segs[k][1].append(argon_cs(Tr, Pr)[idx])
+            try:
+                val = argon_cs(Tr, Pr)[idx]
+            except Exception:
+                continue                           # skip a point CoolProp cannot evaluate
+            segs[k][0].append(Pr); segs[k][1].append(val)
         col = None
         for k in ("v", "l"):
             if segs[k][0]:
@@ -934,6 +940,8 @@ class App:
         """Read the inputs, build the table and show it."""
         if TABLES[self.name.get()][0].startswith("chart"):
             self.src.set(source_text(self.name.get()))
+            self.tree.delete(*self.tree.get_children())   # remove the previous table
+            self.tree["columns"] = []
             self.show_chart()      # charts open in their own window
             return
         try:
